@@ -1,52 +1,40 @@
-import { Module } from '@nestjs/common';
-import { ServeStaticModule } from '@nestjs/serve-static';
-import { join } from 'path';
-import { ConfigModule } from '@nestjs/config';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
-import { PrismaModule } from './prisma/prisma.module';
+import { Module } from '@nestjs/common';                       // Импорт декоратора Module для создания модуля NestJS
+import { ServeStaticModule } from '@nestjs/serve-static';      // Модуль для отдачи статических файлов
+import { join } from 'path';                                   // Утилита для работы с путями файловой системы
+import { ConfigModule } from '@nestjs/config';                 // Модуль для работы с переменными окружения
+import { AppController } from './app.controller';              // Главный контроллер приложения
+import { AppService } from './app.service';                    // Главный сервис приложения
+import { PrismaModule } from './prisma/prisma.module';         // Модуль для работы с Prisma ORM
 import { PrismaService } from './prisma/prisma.service';
-import { SecurityModule } from './security/security.module';
+import { SecurityModule } from './security/security.module';   // Модуль безопасности (например, Guards, Guards)
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
 import { NewsModule } from './news/news.module';
 
 @Module({
   imports: [
-    /**
-     * Подключение ConfigModule для работы с переменными окружения (.env).
-     * 
-     * Опция isGlobal: true — делает модуль глобальным, его не нужно импортировать в других модулях.
-     * envFilePath — путь к файлу с переменными, здесь по умолчанию '.env'.
-     * Можно добавить validationSchema для валидации переменных окружения.
-     */
+    // Загрузка переменных окружения из файла .env, доступных глобально по всему приложению
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
-      // validationSchema: ... (опционально для проверки env)
+      // Здесь можно добавить validationSchema для валидации env переменных
     }),
 
-    /**
-     * ServeStaticModule отвечает за отдачу статических файлов (например, фронтенд или статика).
-     * 
-     * rootPath — абсолютный путь к папке с публичными ресурсами (например, папка 'public')
-     * serveRoot — URL-префикс, с которого будут доступны статические файлы
-     */
+    // Модуль отдачи статических файлов из папки 'public'
+    // Путь вычисляется относительно текущей директории (__dirname), поднимаемся на один уровень и получаем 'public'
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'public'),
-      serveRoot: '/public',
+      // serveRoot по умолчанию '/', то есть статика будет доступна по корню сервера
     }),
-    PrismaModule,
-    AuthModule,
-    SecurityModule,
+    PrismaModule,     // Инициализация базы данных через Prisma ORM
+    AuthModule,       // Аутентификация пользователей
+    SecurityModule,   // Безопасность (например, Guards, шифрование)
     UserModule,
     NewsModule,
   ],
-
-  // Корневой контроллер приложения — обрабатывает базовые HTTP-запросы
+  // Контроллеры, обрабатывающие входящие HTTP-запросы
   controllers: [AppController],
-
-  // Глобальные провайдеры — сервисы, доступные через dependency injection по всему приложению
+  // Провайдеры (сервисы), которые внедряются в классы через DI
   providers: [AppService, PrismaService],
 })
-export class AppModule {}
+export class AppModule { }

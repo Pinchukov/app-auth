@@ -1,62 +1,81 @@
 import { Module } from '@nestjs/common';
+// Импорт декоратора Module из NestJS для создания модуля
+
 import { ConfigModule, ConfigService } from '@nestjs/config';
+// Импорт модуля конфигурации и сервиса для доступа к переменным окружения
+
 import { MailerModule } from '@nestjs-modules/mailer';
+// Модуль для отправки email сообщений
+
 import { JwtModule } from '@nestjs/jwt';
+// Модуль для работы с JWT (JSON Web Token)
+
 import { EmailVerificationService } from './email-verification.service';
+// Сервис, реализующий логику верификации email
+
 import { EmailVerificationController } from './email-verification.controller';
+// Контроллер, обрабатывающий HTTP-запросы по верификации email
+
 import { UserModule } from '../user/user.module';
+// Модуль пользователей, возможно для проверки или получения данных пользователя
+
 
 @Module({
   imports: [
-    ConfigModule, // Модуль для работы с переменными окружения и конфигурациями
-    UserModule,   // Модуль пользователя, нужен для получения и обновления данных пользователей
+    ConfigModule,
+    // Импорт модуля конфигурации для доступа к настройкам из env
 
-    // Конфигурация модуля для отправки email (Mailer)
+    UserModule,
+    // Импорт пользовательского модуля, чтобы работать с пользователями внутри email verification
+
     MailerModule.forRootAsync({
-      imports: [ConfigModule], // Импортируем ConfigModule, чтобы использовать ConfigService для чтения env
+      imports: [ConfigModule],
+      // Импорт ConfigModule внутри MailerModule для доступа к настройкам почты
+
       useFactory: async (configService: ConfigService) => ({
         transport: {
-          // Настройки SMTP сервера для отправки писем
-          host: configService.get<string>('SMTP_HOST'),          // Хост SMTP сервера
-          port: Number(configService.get<string>('SMTP_PORT')),  // Порт SMTP сервера (например, 465)
-          secure: true, // Используется защищённое соединение (SSL/TLS), обычно для порта 465
+          // Настройки для SMTP транспорта (сервер для отправки почты)
+          host: configService.get<string>('SMTP_HOST'),
+          port: Number(configService.get<string>('SMTP_PORT')),
+          secure: true, // Использование защищённого соединения (SSL/TLS)
           auth: {
-            user: configService.get<string>('SMTP_USER'),        // Логин пользователя SMTP
-            pass: configService.get<string>('SMTP_PASS'),        // Пароль SMTP
+            user: configService.get<string>('SMTP_USER'),
+            pass: configService.get<string>('SMTP_PASS'),
           },
         },
         defaults: {
-          // Значения по умолчанию для отправляемых писем
+          // Значения по умолчанию для отправителя письма
           from: `"${configService.get<string>('SMTP_SENDER_NAME') || 'Auth'}" <${configService.get<string>('SMTP_USER')}>`,
-          // Имя отправителя и email
         },
       }),
-      inject: [ConfigService], // Внедряем ConfigService для доступа к env
+      inject: [ConfigService],
+      // Внедрение сервиса ConfigService для динамической настройки
     }),
 
-    // Конфигурация JwtModule для создания и проверки JWT токенов для верификации email
     JwtModule.registerAsync({
-      imports: [ConfigModule], // Импорт ConfigModule для доступа к переменным окружения
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_EMAIL_VERIFICATION_SECRET') || 'email-verif-secret',
-        // Секретный ключ для подписи JWT, берётся из env или используется значение по умолчанию
+      imports: [ConfigModule],
+      // Импорт ConfigModule для доступа к jwt-настройкам
 
+      useFactory: (configService: ConfigService) => ({
+        // Настройки JWT для email верификации
+        secret: configService.get<string>('JWT_EMAIL_VERIFICATION_SECRET') || 'email-verif-secret',
         signOptions: {
-          // Настройки подписи — время жизни токена
+          // Время действия токена верификации (по умолчанию 24 часа)
           expiresIn: configService.get<string>('JWT_EMAIL_VERIFICATION_EXPIRATION') || '24h',
         },
       }),
-      inject: [ConfigService], // Инъекция ConfigService
+      inject: [ConfigService],
+      // Внедрение ConfigService для получения значений из переменных окружения
     }),
   ],
-
-  // Провайдеры, которые будут зарегистрированы и могут быть инжектированы в другие компоненты этого модуля
   providers: [EmailVerificationService],
+  // Провайдеры (сервисы), которые будут использованы внутри модуля
 
-  // Контроллеры, которые обрабатывают входящие HTTP запросы, связанные с верификацией email
   controllers: [EmailVerificationController],
+  // Контроллеры для обработки HTTP-запросов
 
-  // Экспортируем сервис, чтобы его можно было использовать и в других модулях приложения
   exports: [EmailVerificationService],
+  // Экспорт сервиса для использования в других модулях
 })
-export class EmailVerificationModule { }
+export class EmailVerificationModule {}
+// Объявление и экспорт модуля email верификации

@@ -10,69 +10,77 @@ import { RegisterRateLimitGuard } from '../guards/register-rate-limit.guard';
 import { ForgotPasswordRateLimitGuard } from '../guards/forgot-password-rate-limit.guard';
 import { MetricsController } from '../metrics.controller';
 
+/**
+ * SecurityModule — отвечает за:
+ * - блокировку IP-адресов
+ * - глобальное и специализированное ограничение скорости запросов (rate limiting)
+ * - логирование подозрительной активности
+ * - предоставление метрик для мониторинга
+ */
 @Module({
-  // Импортируемые модули, используемые внутри SecurityModule
   imports: [
-    ConfigModule, // Модуль для управления конфигурацией приложения (переменные окружения, .env)
+    ConfigModule,
     ThrottlerModule.forRootAsync({
-      // Асинхронная конфигурация модуля ограничения частоты запросов (rate limiting)
-      imports: [ConfigModule],       // Импорт ConfigModule для доступа к конфигурациям
-      inject: [ConfigService],       // Внедрение ConfigService для получения переменных окружения
+      imports: [ConfigModule],
+      inject: [ConfigService],
       useFactory: (configService: ConfigService): ThrottlerModuleOptions => {
-        // Получаем из конфигурации строку с user-agent-ами, которые нужно игнорировать (например, боты)
+        // Функция для безопасного парсинга числовых переменных окружения с дефолтом
+        const getNumberEnv = (key: string, defaultValue: number): number => {
+          const val = configService.get<string>(key);
+          const num = Number(val);
+          return isNaN(num) ? defaultValue : num;
+        };
+
         const rawBots = configService.get<string>('THROTTLER_IGNORE_USER_AGENTS', '');
         const ignoreUserAgents = rawBots
-          .split(',')              // Разбиваем строку по запятым
-          .map(s => s.trim())      // Удаляем лишние пробелы
-          .filter(Boolean)         // Удаляем пустые строки
-          .map(s => new RegExp(s, 'i')); // Создаём регулярные выражения для игнорируемых user-agent
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean)
+          .map(s => {
+            try {
+              return new RegExp(s, 'i');
+            } catch {
+              // Можно добавить логирование ошибки, для дебага некорректного паттерна
+              return null;
+            }
+          })
+          .filter((re): re is RegExp => re !== null);
 
-        // Возвращаем конфигурацию throttler с несколькими профилями лимитов запросов
         return {
           throttlers: [
             {
-              ttl: Number(configService.get('RATE_LIMIT_TTL') ?? 60),    // Интервал (в секундах) для учёта запросов (по умолчанию 60 с)
-              limit: Number(configService.get('RATE_LIMIT_MAX') ?? 50),  // Максимальное число запросов в указанном интервале (по умолчанию 50)
-              name: 'default', // Имя throttler-а — профиль «по умолчанию»
+              ttl: getNumberEnv('RATE_LIMIT_TTL', 60),
+              limit: getNumberEnv('RATE_LIMIT_MAX', 50),
+              name: 'default',
             },
             {
-              ttl: Number(configService.get('RATE_LIMIT_REGISTER_TTL') ?? 3600),   // Таймаут лимита для регистрации (например, 1 час)
-              limit: Number(configService.get('RATE_LIMIT_REGISTER_MAX') ?? 3),    // Максимум регистраций в этом времени (по умолчанию 3)
-              name: 'register', // Имя throttler-а под регистрацию
+              ttl: getNumberEnv('RATE_LIMIT_REGISTER_TTL', 3600),
+              limit: getNumberEnv('RATE_LIMIT_REGISTER_MAX', 3),
+              name: 'register',
             },
             {
-              ttl: Number(configService.get('RATE_LIMIT_FORGOT_PASSWORD_TTL') ?? 3600), // Таймаут лимита для восстановления пароля
-              limit: Number(configService.get('RATE_LIMIT_FORGOT_PASSWORD_MAX') ?? 5),  // Максимум запросов на сброс пароля (по умолчанию 5)
-              name: 'forgot-password', // Имя throttler-а для восстановления пароля
+              ttl: getNumberEnv('RATE_LIMIT_FORGOT_PASSWORD_TTL', 3600),
+              limit: getNumberEnv('RATE_LIMIT_FORGOT_PASSWORD_MAX', 5),
+              name: 'forgot-password',
             },
           ],
-          ignoreUserAgents, // User-agent’ы, которые не будут ограничены лимитами (например, боты)
+          ignoreUserAgents,
         };
       },
     }),
   ],
-
-  // Контроллеры, зарегистрированные в модуле
-  controllers: [MetricsController], // Контроллер для экспорта метрик Prometheus или других статистик
-
-  // Провайдеры (сервисы, guard’ы и вспомогательные классы), доступные внутри модуля
+  controllers: [MetricsController],
   providers: [
-    IpBlocklistService,   // Сервис для управления блокировкой IP-адресов
-    SecurityService,      // Центральный сервис безопасности — логирование, блокировки и пр.
-    Reflector,            // Сервис для работы с метаданными (используется в Guard'ах и декораторах)
+    IpBlocklistService,
+    SecurityService,
+    Reflector,
     {
       provide: APP_GUARD,
-      useClass: RateLimitGuard,  // Главный глобальный Guard, отвечающий за ограничение скорости запросов
+      useClass: RateLimitGuard,
     },
-    RegisterRateLimitGuard,       // Специализированный Guard для ограничения скорости регистрации пользователей
-    ForgotPasswordRateLimitGuard, // Guard для ограничения частоты запросов на восстановление пароля
-  ],
-
-  // Экспортируемые провайдеры, которые могут использоваться в других модулях приложения
-  exports: [
-    SecurityService,
     RegisterRateLimitGuard,
     ForgotPasswordRateLimitGuard,
   ],
+  exports: [SecurityService, RegisterRateLimitGuard, ForgotPasswordRateLimitGuard],
 })
 export class SecurityModule {}

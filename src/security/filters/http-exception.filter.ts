@@ -3,47 +3,80 @@ import {
   Catch,
   ArgumentsHost,
   HttpException,
+  Logger,
 } from '@nestjs/common';
+import { Request, Response } from 'express';
 
+// Определяем примитивные типы, которые могут входить в JSON
+type Primitive = string | number | boolean | null;
+
+// Универсальный тип для любых JSON-значений: примитив, объект или массив
+type JsonValue = Primitive | JsonObject | JsonArray;
+
+// Объект с произвольными ключами, где значения — JSON-значения
+interface JsonObject {
+  [key: string]: JsonValue;
+}
+
+// Массив JSON-значений
+interface JsonArray extends Array<JsonValue> {}
+
+// Интерфейс для структуры ответа, которую возвращает HttpException
+export interface HttpExceptionResponse {
+  statusCode?: number;           // HTTP статус код ошибки (например, 404)
+  message?: string | string[];  // Сообщение или массив сообщений
+  error?: string;                // Название ошибки (например, "Not Found")
+  [key: string]: JsonValue | undefined; // Любые дополнительные поля
+}
+
+// Декоратор @Catch указывает, что фильтр обрабатывает HttpException
 @Catch(HttpException)
-// Декоратор @Catch указывает, что этот фильтр ловит исключения типа HttpException
 export class HttpExceptionFilter implements ExceptionFilter {
-  /**
-   * Метод, вызываемый при перехвате исключения
-   * @param exception - пойманное исключение типа HttpException
-   * @param host - объект, предоставляющий доступ к контексту выполнения (запрос, ответ и т.д.)
-   */
+  private readonly logger = new Logger(HttpExceptionFilter.name);
+
   catch(exception: HttpException, host: ArgumentsHost) {
-    // Получаем контекст HTTP-запроса
+    // Получаем контекст запроса и ответа в HTTP среде
     const ctx = host.switchToHttp();
+    const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
 
-    // Получаем объект ответа (response) Express/HTTP
-    const response = ctx.getResponse();
-
-    // Получаем объект запроса (request)
-    const request = ctx.getRequest();
-
-    // Получаем HTTP-статус исключения (например, 404, 400, 500)
+    // Получаем статус код, например 400, 404, 500 и т.д.
     const status = exception.getStatus();
 
-    // Получаем тело ответа из исключения — может быть строкой или объектом
+    // Получаем тело исключения — это может быть строка или объект с деталями
     const exceptionResponse = exception.getResponse();
 
-    // Извлекаем сообщение ошибки:
-    // если тело — строка, используем её,
-    // если объект — пытаемся взять поле message,
-    // иначе используем стандартное сообщение исключения
-    const message =
-      typeof exceptionResponse === 'string'
-        ? exceptionResponse
-        : (exceptionResponse as any).message || exception.message;
+    // Приводим к интерфейсу HttpExceptionResponse, если объект
+    const responseObj: HttpExceptionResponse | null =
+      typeof exceptionResponse === 'object' ? (exceptionResponse as HttpExceptionResponse) : null;
 
-    // Формируем и отправляем JSON-ответ клиенту с информацией об ошибке
+    // Определяем имя ошибки
+    const error = responseObj?.error || exception.name;
+
+    // Получаем сообщение или массив сообщений
+    const messageRaw = responseObj?.message || exception.message;
+
+    // Если сообщение массив - объединяем в строку через "; "
+    const message = Array.isArray(messageRaw) ? messageRaw.join('; ') : messageRaw;
+
+    // Логируем предупреждения для часто встречающихся клиентских ошибок
+    if ([400, 401, 403, 404, 409, 429].includes(status)) {
+      this.logger.warn(`HTTP Exception: [${status}] ${message} | Path: ${request.url}`);
+    } else {
+      // Все прочие ошибки логируем с уровнем error и стеком вызовов
+      this.logger.error(
+        `HTTP Exception: [${status}] ${message} | Path: ${request.url}`,
+        exception.stack,
+      );
+    }
+
+    // Возвращаем клиенту структурированный JSON с деталями ошибки
     response.status(status).json({
-      statusCode: status,               // HTTP статус ошибки
-      message,                         // Сообщение об ошибке
-      timestamp: new Date().toISOString(), // Время возникновения ошибки в ISO формате
-      path: request.url,               // URL запроса, на котором возникла ошибка
+      statusCode: status,
+      error,
+      message,
+      timestamp: new Date().toISOString(),
+      path: request.url,
     });
   }
 }
