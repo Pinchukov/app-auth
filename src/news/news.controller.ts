@@ -9,7 +9,10 @@ import {
   ParseIntPipe,
   UseGuards,
   HttpCode,
+  Request,
 } from '@nestjs/common';
+
+import { Request as ExpressRequest } from 'express';
 
 import { NewsService } from './news.service';
 import { CreateNewsDto } from './dto/create-news.dto';
@@ -19,6 +22,13 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/guards/roles.decorator';
 import { Role } from '@prisma/client';
+
+interface IUserRequest extends ExpressRequest {
+  user: {
+    role: Role;
+    // Можно добавить другие поля, если нужно: id, email и т.д.
+  };
+}
 
 @Controller('news')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -35,22 +45,25 @@ export class NewsController {
   @Get('all')
   @Roles(Role.ADMIN, Role.USER)
   @HttpCode(200)
-  findAll() {
-    return this.newsService.findAll();
+  findAll(@Request() req: IUserRequest) {
+    const userRole = req.user.role;
+    return this.newsService.findAll(userRole);
   }
 
   @Get(':id')
   @Roles(Role.ADMIN, Role.USER)
   @HttpCode(200)
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.newsService.findOne(id);
+  findOne(@Param('id', ParseIntPipe) id: number, @Request() req: IUserRequest) {
+    const userRole = req.user.role;
+    return this.newsService.findOne(id, userRole);
   }
 
   @Get('url/:url')
   @Roles(Role.ADMIN, Role.USER)
   @HttpCode(200)
-  findByUrl(@Param('url') url: string) {
-    return this.newsService.findByUrl(url);
+  findByUrl(@Param('url') url: string, @Request() req: IUserRequest) {
+    const userRole = req.user.role;
+    return this.newsService.findByUrl(url, userRole);
   }
 
   @Patch(':id')
