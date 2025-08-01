@@ -45,9 +45,9 @@ test-results
 .gitignore
 
 # Docker
-#Dockerfile
-#docker-compose.yml
-#.dockerignore
+Dockerfile
+docker-compose.yml
+.dockerignore
 
 # Prisma (исключаем миграции, они должны выполняться отдельно)
 prisma/migrations

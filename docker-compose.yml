@@ -1,0 +1,67 @@
+# version: "3.9"
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: app-auth-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: mypass
+      MYSQL_DATABASE: BDname
+      MYSQL_USER: app_user
+      MYSQL_PASSWORD: mypass
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d
+    networks:
+      - app-network
+    command: --default-authentication-plugin=mysql_native_password
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: app-auth-phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_USER: root
+      PMA_PASSWORD: mypass
+      MYSQL_ROOT_PASSWORD: mypass
+    ports:
+      - "8080:80"
+    depends_on:
+      - mysql
+    networks:
+      - app-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        USER_ID: ${USER_ID:-1000}
+        GROUP_ID: ${GROUP_ID:-1000}
+    container_name: app-auth-backend
+    restart: unless-stopped
+    ports:
+      - "10005:10005"
+    depends_on:
+      - mysql
+    networks:
+      - app-network
+    volumes:
+      - .:/app
+      - /app/node_modules
+    env_file:
+      - .env
+    command: sh -c "npx prisma db push && npm run start:dev"
+    user: "${USER_ID}:${GROUP_ID}"
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
