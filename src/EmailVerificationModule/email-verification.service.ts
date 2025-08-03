@@ -74,10 +74,17 @@ export class EmailVerificationService {
     });
   }
 
-  // Формирует URL для перехода пользователем для подтверждения email
   private buildVerificationUrl(token: string): string {
+    // Получаем текущую среду из ConfigService
+    const environment = this.configService.get<string>('NODE_ENV', 'development');
+    
+    // Формируем URL в зависимости от среды
+    const apiPath = environment === 'development' 
+      ? `${this.backendUrl}/api/auth/verify` 
+      : `${this.backendUrl}/auth/verify`;
+      
     // Ссылка на эндпоинт бекенда с параметром токена, который нужно подтвердить
-    return `${this.backendUrl}/api/auth/verify?token=${encodeURIComponent(token)}`;
+    return `${apiPath}?token=${encodeURIComponent(token)}`;
   }
 
   // Формирует поле "from" для письма в формате "Имя <email>"
