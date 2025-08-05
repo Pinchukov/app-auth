@@ -6,12 +6,6 @@ import { JwtPayload } from '../interfaces/jwt-payload.interface';
 import { UserService } from '../../user/user.service';
 import { Request } from 'express';
 
-interface ValidatedUser {
-  userId: number;
-  email: string;
-  role: string;
-}
-
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(
@@ -27,19 +21,16 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new Error('JWT_ACCESS_TOKEN_SECRET is not defined!');
     }
 
-    // Убираем кавычки, если они есть
     const secret = secretRaw.replace(/^"(.+)"$/, '$1');
 
     return {
       jwtFromRequest: (req: Request) => {
         if (!req) return null;
 
-        // Ищем токен сначала в cookie 'accessToken'
         if (req.cookies && req.cookies['accessToken']) {
           return req.cookies['accessToken'];
         }
 
-        // Если токена нет в cookie — ищем в заголовке Authorization Bearer
         return ExtractJwt.fromAuthHeaderAsBearerToken()(req);
       },
       secretOrKey: secret,
@@ -48,7 +39,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     };
   }
 
-  async validate(payload: JwtPayload): Promise<ValidatedUser> {
+  async validate(payload: JwtPayload): Promise<JwtPayload> {
     if (!payload.sub || !payload.email) {
       throw new UnauthorizedException(
         'Неверная полезная нагрузка токена: отсутствует userId или email',
@@ -61,7 +52,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     }
 
     return {
-      userId: user.id,
+      sub: user.id,
       email: user.email,
       role: user.role,
     };

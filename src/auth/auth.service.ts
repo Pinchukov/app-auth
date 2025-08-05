@@ -92,8 +92,9 @@ export class AuthService {
 
   async logout(userId: number): Promise<void> {
     if (!userId) {
-      throw new BadRequestException('userId is required for logout');
+      throw new BadRequestException('Для выхода из системы требуется идентификатор пользователя (userId).');
     }
+
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       throw new NotFoundException(`Пользователь с id ${userId} не найден`);
