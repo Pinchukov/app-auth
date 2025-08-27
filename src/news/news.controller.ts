@@ -22,6 +22,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/guards/roles.decorator';
 import { Role } from '@prisma/client';
+import { Public } from '../auth/decorators/public.decorator';
 
 interface IUserRequest extends ExpressRequest {
   user: {
@@ -33,7 +34,7 @@ interface IUserRequest extends ExpressRequest {
 @Controller('news')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class NewsController {
-  constructor(private readonly newsService: NewsService) {}
+  constructor(private readonly newsService: NewsService) { }
 
   @Post('create')
   @Roles(Role.ADMIN)
@@ -42,13 +43,22 @@ export class NewsController {
     return this.newsService.create(createNewsDto);
   }
 
+  // @Get('all')
+  // //@Roles(Role.ADMIN, Role.USER)
+  // @HttpCode(200)
+  // findAll(@Request() req: IUserRequest) {
+  //   const userRole = req.user.role;
+  //   return this.newsService.findAll(userRole);
+  // }
+
   @Get('all')
-  @Roles(Role.ADMIN, Role.USER)
+  @Public()
   @HttpCode(200)
   findAll(@Request() req: IUserRequest) {
-    const userRole = req.user.role;
+    const userRole = req.user?.role ?? null;
     return this.newsService.findAll(userRole);
   }
+
 
   @Get(':id')
   @Roles(Role.ADMIN, Role.USER)

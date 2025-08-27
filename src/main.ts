@@ -18,7 +18,7 @@ async function bootstrap() {
   logger.log(`🌍 Запуск в режиме: ${environment}`);
 
   // Используем configService для получения env переменных с дефолтами
-  const frontendHost = configService.get<string>('URL_FRONTEND', 'https://mydomain.ru');
+  const frontendHost = configService.get<string>('URL_FRONTEND', 'https://node.dvgid.ru');
   const frontendPort = configService.get<number>('PORT_FRONTEND', 10000);
   const backendPort = configService.get<number>('PORT_BACKEND', 10001);
 

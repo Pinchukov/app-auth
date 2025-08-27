@@ -51,9 +51,11 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('Пользователь не найден');
     }
 
+    // Возвращаем поля, которые будут доступны в Request.user после аутентификации
     return {
       sub: user.id,
       email: user.email,
+      //name: user.name,
       role: user.role,
     };
   }
