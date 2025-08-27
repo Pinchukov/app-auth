@@ -18,12 +18,12 @@ export class NewsService {
     NEWS_NOT_FOUND_BY_URL: (url: string) => `Новость с url "${url}" не найдена`,
   };
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async create(createNewsDto: CreateNewsDto) {
     try {
-      return await this.prisma.news.create({ 
-        data: createNewsDto 
+      return await this.prisma.news.create({
+        data: createNewsDto
       });
     } catch (error) {
       this.handleUniqueUrlError(error);
@@ -33,7 +33,7 @@ export class NewsService {
 
   async findAll(userRole: Role): Promise<NewsWithAuthor[]> {
     const news = await this.getActiveNewsWithAuthors();
-    
+
     return news.map(newsItem => this.mapNewsToWithAuthor(newsItem, userRole));
   }
 
@@ -93,40 +93,77 @@ export class NewsService {
 
   private transformAuthor(author: any, userRole: Role): AuthorUserDto | AuthorAdminDto {
     const AuthorDtoClass = userRole === Role.ADMIN ? AuthorAdminDto : AuthorUserDto;
-    
-    return plainToInstance(AuthorDtoClass, author, { 
-      excludeExtraneousValues: true 
+
+    return plainToInstance(AuthorDtoClass, author, {
+      excludeExtraneousValues: true
     });
   }
+
+
+
+
 
   // Приватные методы для работы с данными
   private async getActiveNewsWithAuthors() {
     return this.prisma.news.findMany({
       where: { status: true },
-      include: { author: true },
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            //email: true,
+            //role: true,
+            //status: true,
+            // исключаем createdAt и updatedAt (не указываем)
+          }
+        }
+      },
     });
   }
 
   private async getNewsWithAuthorById(id: number) {
     return this.prisma.news.findUnique({
       where: { id },
-      include: { author: true },
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            //email: true,
+            //role: true,
+            //status: true,
+            // исключаем createdAt и updatedAt (не указываем)
+          }
+        }
+      },
     });
   }
 
   private async getNewsWithAuthorByUrl(url: string) {
     return this.prisma.news.findUnique({
       where: { url },
-      include: { author: true },
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            //email: true,
+            //role: true,
+            //status: true,
+            // исключаем createdAt и updatedAt (не указываем)
+          }
+        }
+      },
     });
   }
 
   private async ensureNewsExists(id: number): Promise<void> {
-    const existing = await this.prisma.news.findUnique({ 
+    const existing = await this.prisma.news.findUnique({
       where: { id },
       select: { id: true } // Выбираем только id для оптимизации
     });
-    
+
     if (!existing) {
       throw new NotFoundException(NewsService.ERROR_MESSAGES.NEWS_NOT_FOUND_BY_ID(id));
     }
@@ -151,11 +188,11 @@ export class NewsService {
     }
 
     const target = error.meta?.target;
-    
+
     if (typeof target === 'string') {
       return target.includes(NewsService.URL_CONSTRAINT_FIELD);
     }
-    
+
     if (Array.isArray(target)) {
       return target.includes(NewsService.URL_CONSTRAINT_FIELD);
     }
